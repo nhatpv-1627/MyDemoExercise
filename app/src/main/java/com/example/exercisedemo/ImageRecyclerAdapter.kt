@@ -27,17 +27,26 @@ class ImageRecyclerAdapter(
     }
 
     override fun onBindViewHolder(holder: MyViewHolder, position: Int) {
-        if (images[position].bitmap != null) {
-            holder.ivImage.setImageBitmap(images[position].bitmap)
-        } else {
-            holder.ivImage.setImageResource(R.drawable.ic_baseline_av_timer_24)
+        images[position].localPath?.let {
             holder.ivImage.tag = images[position].id
             scope.launch(Dispatchers.IO + errorHandler) {
-                images[position].bitmap = getImageBitmapFromUrl(images[position].url)
+                val bitmap = getBitmapImageFromPath(it)
                 withContext(Dispatchers.Main) {
                     if (holder.ivImage.tag == images[position].id)
-                        holder.ivImage.setImageBitmap(images[position].bitmap)
+                        holder.ivImage.setImageBitmap(bitmap)
                 }
+            }
+        } ?: loadBitMap(holder.ivImage, images[position])
+    }
+
+    private fun loadBitMap(ivImage: ImageView, imageData: ImageData) {
+        ivImage.setImageResource(R.drawable.ic_baseline_av_timer_24)
+        ivImage.tag = imageData.id
+        scope.launch(Dispatchers.IO + errorHandler) {
+            imageData.localPath = saveImageToLocal(imageData.url, ivImage.context)
+            withContext(Dispatchers.Main) {
+                if (ivImage.tag == imageData.id && imageData.localPath != null)
+                    ivImage.setImageBitmap(getBitmapImageFromPath(imageData.localPath!!))
             }
         }
     }

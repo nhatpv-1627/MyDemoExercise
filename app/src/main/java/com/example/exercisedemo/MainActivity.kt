@@ -25,6 +25,11 @@ class MainActivity : AppCompatActivity() {
         rvImages.adapter = adapter
     }
 
+    override fun onDestroy() {
+        releaseStorage(this)
+        super.onDestroy()
+    }
+
     private fun sampleData() =
         listOf(
             ImageData(1, "https://gamerviet.vn/wp-content/uploads/2020/06/farcry-ava.jpg"),
