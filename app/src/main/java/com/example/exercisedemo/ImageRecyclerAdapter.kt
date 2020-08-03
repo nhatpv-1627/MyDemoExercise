@@ -16,7 +16,7 @@ class ImageRecyclerAdapter(
     private val errorHandler: CoroutineExceptionHandler
 ) :
     RecyclerView.Adapter<ImageRecyclerAdapter.MyViewHolder>() {
-
+    private val lruCache = ImageCacheHelper.getInstance()
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MyViewHolder {
         return MyViewHolder(View.inflate(parent.context, R.layout.item_image, null))
@@ -27,19 +27,27 @@ class ImageRecyclerAdapter(
     }
 
     override fun onBindViewHolder(holder: MyViewHolder, position: Int) {
-        if (images[position].bitmap != null) {
-            holder.ivImage.setImageBitmap(images[position].bitmap)
-        } else {
-            holder.ivImage.setImageResource(R.drawable.ic_baseline_av_timer_24)
-            holder.ivImage.tag = images[position].id
-            scope.launch(Dispatchers.IO + errorHandler) {
-                images[position].bitmap = getImageBitmapFromUrl(images[position].url)
-                withContext(Dispatchers.Main) {
-                    if (holder.ivImage.tag == images[position].id)
-                        holder.ivImage.setImageBitmap(images[position].bitmap)
-                }
+        val imageBitmap = lruCache.getDataOrNull(images[position].url)
+        imageBitmap?.let {
+            holder.ivImage.setImageBitmap(it)
+        } ?: loadImage(holder.ivImage, images[position])
+    }
+
+    private fun loadImage(ivImage: ImageView, imageData: ImageData) {
+        ivImage.setImageResource(R.drawable.ic_baseline_av_timer_24)
+        ivImage.tag = imageData.id
+        scope.launch(Dispatchers.IO + errorHandler) {
+            val bitmap = getImageBitmapFromUrl(imageData.url)
+            bitmap?.let { lruCache.getLruCache()?.put(imageData.url, it) }
+            withContext(Dispatchers.Main) {
+                if (ivImage.tag == imageData.id)
+                    ivImage.setImageBitmap(bitmap)
             }
         }
+    }
+
+    fun deleteCacheData() {
+        lruCache.getLruCache()?.evictAll()
     }
 
     class MyViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
