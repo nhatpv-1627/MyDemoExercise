@@ -13,13 +13,18 @@ import kotlinx.coroutines.withContext
 class ImageRecyclerAdapter(
     private val scope: LifecycleCoroutineScope,
     private val images: List<ImageData>,
-    private val errorHandler: CoroutineExceptionHandler
+    private val errorHandler: CoroutineExceptionHandler,
+    private val onItemClick: (image: ImageData) -> Unit
 ) :
     RecyclerView.Adapter<ImageRecyclerAdapter.MyViewHolder>() {
     private val lruCache = ImageCacheHelper.getInstance()
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MyViewHolder {
-        return MyViewHolder(View.inflate(parent.context, R.layout.item_image, null))
+        return MyViewHolder(View.inflate(parent.context, R.layout.item_image, null)).apply {
+            ivImage.setOnClickListener {
+                onItemClick(images[layoutPosition])
+            }
+        }
     }
 
     override fun getItemCount(): Int {
@@ -27,8 +32,7 @@ class ImageRecyclerAdapter(
     }
 
     override fun onBindViewHolder(holder: MyViewHolder, position: Int) {
-        val imageBitmap = lruCache.getDataOrNull(images[position].url)
-        imageBitmap?.let {
+        lruCache.getDataOrNull(images[position].url)?.let {
             holder.ivImage.setImageBitmap(it)
         } ?: loadImage(holder.ivImage, images[position])
     }

@@ -1,13 +1,17 @@
 package com.example.exercisedemo
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import kotlinx.android.synthetic.main.activity_main.*
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MainActivity : AppCompatActivity() {
 
@@ -21,8 +25,48 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-        adapter = ImageRecyclerAdapter(lifecycleScope, sampleData(), errorHandler)
+        adapter = ImageRecyclerAdapter(lifecycleScope, sampleData(), errorHandler) {
+            requestPermission {
+                onImageItemClick(it)
+            }
+        }
         rvImages.adapter = adapter
+    }
+
+    private fun onImageItemClick(image: ImageData) =
+        lifecycleScope.launch(Dispatchers.IO + errorHandler) {
+            val imagePath = saveImageToExternalStorage(image, this@MainActivity)
+            val txtPath = saveTextFileToCache(image.id, getCurrentTime(), this@MainActivity)
+            val textContent = readTextFromFile(txtPath)
+            withContext(Dispatchers.Main) {
+                Toast.makeText(
+                    this@MainActivity,
+                    "Text Content: $textContent",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+
+    private fun requestPermission(onAllPermissionGranted: () -> Unit) {
+        if (ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.READ_EXTERNAL_STORAGE
+            ) == PackageManager.PERMISSION_GRANTED
+            &&
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.WRITE_EXTERNAL_STORAGE
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+            onAllPermissionGranted()
+        } else {
+            requestPermissions(
+                arrayOf(
+                    Manifest.permission.READ_EXTERNAL_STORAGE,
+                    Manifest.permission.WRITE_EXTERNAL_STORAGE
+                ), REQUEST_PERMISSION_CODE
+            )
+        }
     }
 
     override fun onDestroy() {
