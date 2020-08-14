@@ -1,8 +1,15 @@
 package com.example.exercisedemo
 
 import android.Manifest
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.os.Handler
+import android.os.IBinder
+import android.os.Looper
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -12,8 +19,14 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
 
 class MainActivity : AppCompatActivity() {
+
+    private lateinit var handler: Handler
+    private lateinit var executorService: ThreadPoolExecutor
 
     private var adapter: ImageRecyclerAdapter? = null
     private var errorHandler = CoroutineExceptionHandler { _, throwable ->
@@ -22,14 +35,108 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private var isBounding = false
+    private var downloadService: DownloadService? = null
+
+    // create a connection
+    private val serviceConnection = object : ServiceConnection {
+        override fun onServiceDisconnected(name: ComponentName?) {
+            isBounding = true
+        }
+
+        override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+            val binder = service as DownloadService.DownloadBinder
+            downloadService = binder.getService()
+            downloadService?.notifyUiCallback = object : DownloadService.NotifyUiCallback {
+                override fun notifyProcess(process: Pair<Int, Int>) {
+                    runOnUiThread {
+                        Toast.makeText(
+                            this@MainActivity,
+                            getString(R.string.uploaded_in_sum, process.first, process.second),
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+
+                }
+            }
+            isBounding = false
+        }
+
+    }
+
+    override fun onStart() {
+        super.onStart()
+        // bind to service
+        Intent(this, DownloadService::class.java).also { intent ->
+            bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
+        }
+
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-        adapter = ImageRecyclerAdapter(lifecycleScope, sampleData(), errorHandler) {
+        initViews()
+        handleEvents()
+        listenerHandler()
+    }
+
+    private fun handleEvents() {
+        val intent = Intent(this, DownloadService::class.java)
+        intent.putExtra(EXTRA_IMAGE_LIST, ListData(sampleData()))
+        btnDownloadAll.setOnClickListener {
+            startService(intent)
+        }
+    }
+
+    /**
+     * other method to get data from Message class
+     * post(Runnable)
+     * postAtTime(Runnable, long)
+     * postDelayed(Runnable, Object, long)
+     * */
+
+    private fun listenerHandler() {
+        handler = Handler(Looper.getMainLooper(), Handler.Callback { mess ->
+            when (mess.what) {
+                DOWNLOAD_IMAGE_SUCCESS_CODE -> {
+                    Toast.makeText(
+                        this@MainActivity,
+                        "Image: ${mess.data.get(EXTRA_DOWNLOAD_SUCCESS)}, Downloaded ${executorService.completedTaskCount}/${executorService.taskCount} ",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    true
+                }
+                DOWNLOAD_IMAGE_FAIL_CODE -> {
+                    Toast.makeText(this@MainActivity, "An error has occurred", Toast.LENGTH_SHORT)
+                        .show()
+                    true
+                }
+                else -> false
+            }
+        })
+    }
+
+    private fun initViews() {
+        executorService = ThreadPoolExecutor(
+            CORE_THREAD_NUM, MAX_THREAD_NUM, THREAD_ALIVE_TIME, TimeUnit.SECONDS,
+            LinkedBlockingQueue<Runnable>()
+        )
+
+        //val executorService = Executors.newFixedThreadPool(5) as ThreadPoolExecutor
+        adapter = ImageRecyclerAdapter(lifecycleScope, sampleData(), errorHandler, {
             requestPermission {
                 onImageItemClick(it)
             }
+        }) {
+            val runnable = DownloadRunnable(it, this@MainActivity, { path ->
+                runOnUiThread {
+                    // TODO handle with UI
+                }
+            }, handler)
+            executorService.execute(runnable)
         }
+
         rvImages.adapter = adapter
     }
 
@@ -67,6 +174,12 @@ class MainActivity : AppCompatActivity() {
                 ), REQUEST_PERMISSION_CODE
             )
         }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        unbindService(serviceConnection)
+        isBounding = false
     }
 
     override fun onDestroy() {
@@ -144,6 +257,42 @@ class MainActivity : AppCompatActivity() {
             ImageData(
                 21,
                 "https://www.pdvg.it/wp-content/uploads/2018/12/far-cry-new-dawn-reveal-trailer_n9eh.jpg"
+            ),
+
+            ImageData(
+                22, "https://i.pinimg.com/236x/2d/b2/48/2db2483ecacc4f1da022cb283aed9385.jpg"
+            ),
+
+            ImageData(
+                23, "https://i.pinimg.com/236x/6a/f5/19/6af5195f0015fd5afaf004e6842545e6.jpg"
+            ),
+
+            ImageData(
+                24, "https://i.pinimg.com/236x/d6/24/0c/d6240ce5194df9221c8285a6bd621c64.jpg"
+            ),
+
+            ImageData(
+                25, "https://i.pinimg.com/236x/36/56/52/365652a4442df270b7757bf52ec26faf.jpg"
+            ),
+
+            ImageData(
+                26, "https://i.pinimg.com/236x/d6/53/3f/d6533fc7eba98ff6b8a54e08c8035841.jpg"
+            ),
+
+            ImageData(
+                27, "https://i.pinimg.com/236x/f1/5e/f9/f15ef97cec7440983fc57b9cdd7b5bf4.jpg"
+            ),
+
+            ImageData(
+                28, "https://i.pinimg.com/236x/7b/52/27/7b52275611556939edf8e9955bb60516.jpg"
+            ),
+
+            ImageData(
+                29, "https://i.pinimg.com/236x/48/bd/fe/48bdfe67fdeeb66a616d377b3fd05790.jpg"
+            ),
+
+            ImageData(
+                30, "https://i.pinimg.com/236x/87/fb/54/87fb54b144a1e9bb6a9bc9ba73e9430a.jpg"
             )
         )
 }
