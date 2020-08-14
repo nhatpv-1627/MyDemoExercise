@@ -1,3 +1,7 @@
 <resources>
     <string name="app_name">ExerciseDemo</string>
+    <string name="download_all">Download All</string>
+    <string name="uploading_images">Downloading images</string>
+    <string name="uploaded_in_sum">Downloading %d / %d images</string>
+    <string name="ticker_text">Ticker Text</string>
 </resources>

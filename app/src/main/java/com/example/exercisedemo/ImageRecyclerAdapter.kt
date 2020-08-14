@@ -14,7 +14,8 @@ class ImageRecyclerAdapter(
     private val scope: LifecycleCoroutineScope,
     private val images: List<ImageData>,
     private val errorHandler: CoroutineExceptionHandler,
-    private val onItemClick: (image: ImageData) -> Unit
+    private val onItemClick: (image: ImageData) -> Unit,
+    private val onDownloadClick: (image: ImageData) -> Unit
 ) :
     RecyclerView.Adapter<ImageRecyclerAdapter.MyViewHolder>() {
     private val lruCache = ImageCacheHelper.getInstance()
@@ -23,6 +24,9 @@ class ImageRecyclerAdapter(
         return MyViewHolder(View.inflate(parent.context, R.layout.item_image, null)).apply {
             ivImage.setOnClickListener {
                 onItemClick(images[layoutPosition])
+            }
+            ivDownload.setOnClickListener {
+                onDownloadClick(images[layoutPosition])
             }
         }
     }
@@ -56,5 +60,6 @@ class ImageRecyclerAdapter(
 
     class MyViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val ivImage: ImageView = itemView.findViewById(R.id.ivImage)
+        val ivDownload: ImageView = itemView.findViewById(R.id.ivDownload)
     }
 }
